@@ -228,8 +228,7 @@ different ways:
 - **Inline Groovy**: Groovy code in `<script><![CDATA[...]]></script>` blocks
   within XML
 - **External Groovy script**: `type="script"
-  location="component://component-name/service/path/script.groovy"`
-  - Script file lives in `service/` directory alongside XML definitions
+  location="component://component-name/script/path/script.groovy"`
   - Has full ExecutionContext (`ec`) access, transaction management, etc.
   - Example:
     `location="component://mantle-usl/service/mantle/party/PartyServices/findParty.groovy"`
