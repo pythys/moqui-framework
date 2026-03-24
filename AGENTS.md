@@ -141,9 +141,10 @@ sleep 2
 # Start server in background (output goes to /tmp/moqui-server.log)
 nohup ./gradlew run > /tmp/moqui-server.log 2>&1 &
 
-# Wait for server to be ready (typically 30-60 seconds)
+# Wait for server to be ready (typically 2-5 seconds after previous startup)
 for i in {1..60}; do
-  if grep -q "Started oejs.ServerConnector.*8080" /tmp/moqui-server.log 2>/dev/null; then
+  if grep -q "Started oejs.ServerConnector.*8080" /tmp/moqui-server.log 2>/dev/null || \
+     strings /tmp/moqui-server.log 2>/dev/null | grep -q "Started oejs.ServerConnector.*8080"; then
     echo "Server is ready!"
     break
   fi
@@ -152,23 +153,22 @@ done
 ```
 
 **Verifying Server is Running**:
-
 ```bash
 # Test with a simple REST call
 curl -u john.doe:moqui http://localhost:8080/rest/s1/mantle/parties
-
-# Or check the log for the startup message
-grep "Started oejs.ServerConnector.*8080" /tmp/moqui-server.log
+# Or check the log for the startup message (use strings if log is binary)
+grep "Started oejs.ServerConnector.*8080" /tmp/moqui-server.log || strings /tmp/moqui-server.log | grep "Started oejs.ServerConnector.*8080"
 ```
 
 **Stopping the Server**:
-
 ```bash
-# Find and kill the Gradle process
+# IMPORTANT: Stop any existing server first to avoid port conflicts
 pkill -f "gradlew run"
-
-# Or find the specific PID
-ps aux | grep "gradlew run" | grep -v grep | awk '{print $2}' | xargs kill
+# Also kill any java process using port 8080 (in case Gradle spawned it)
+kill $(ss -tlnp 2>/dev/null | grep :8080 | grep -oP 'pid=\K\d+' | head -1) 2>/dev/null || true
+sleep 2
+# Verify port is free
+ss -tlnp 2>/dev/null | grep :8080 || echo "Port 8080 is free"
 ```
 
 **Notes:**
