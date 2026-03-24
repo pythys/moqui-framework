@@ -66,7 +66,8 @@ Moqui requires 3 servers to run: database (embedded H2 for development), OpenSea
 
 **Standard development workflow:**
 ```bash
-./gradlew cleanAll              # Stops OpenSearch, deletes all data, restarts OpenSearch
+./gradlew cleanAll              # Stops OpenSearch, deletes all data (does NOT restart OpenSearch automatically)
+./gradlew startElasticSearch    # Restart OpenSearch after cleanAll
 ./gradlew load                  # Build framework and load seed/demo data
 ```
 
@@ -114,15 +115,15 @@ The server starts at http://localhost:8080 with default credentials: `john.doe` 
 **Data Development Workflow**:
 1. Create data XML in `component-name/data/*.xml` using full entity names
 2. Load data: `./gradlew load -Ptypes=demo` (or `./gradlew load` for all)
-3. Verify via REST (`curl -u john.doe:moqui http://localhost:8080/rest/e1/EntityName`) or EntityDataFind UI
+3. Verify via REST (`curl -u john.doe:moqui http://localhost:8080/rest/s1/mantle/parties`) or EntityDataFind UI
 4. Monitor server output for parsing/constraint/foreign key errors
 5. Test service with loaded data
 6. Iterate: modify data files and reload until working
 
 **Ad-hoc Testing** (non-persistent):
-- **DataImport UI**: http://localhost:8080/tools/Entity/DataImport (XML/JSON/CSV text input)
-- **EntityDataFind UI**: http://localhost:8080/tools/Entity/DataEdit/EntityDataFind (create/edit records)
-- **REST API**: `curl -X POST http://localhost:8080/rest/e1/EntityName` with JSON body
+- **DataImport UI**: http://localhost:8080/qapps/tools/Entity/DataImport (XML/JSON/CSV text input)
+- **EntityDataFind UI**: http://localhost:8080/qapps/tools/Entity/DataEdit/EntityDataFind (create/edit records)
+- **REST API**: Direct entity manipulation requires authorization permissions not granted by default to john.doe
 
 **Important**: Data loads are transactional (errors rollback entire file). Use `type="demo"` for test data, `type="seed"` for required system data.
 
@@ -147,15 +148,13 @@ Services are always defined in `service/*.xml` and can be implemented in differe
 Services defined as `<service verb="get" noun="OrderInfo">` are called as `mantle.order.OrderServices.get#OrderInfo`.
 
 **Accessing Services**:
-- **Built-in REST API** (`/rest/s1/`): Auto-exposes all services at `/rest/s1/{namespace}/{verb}/{noun}`
-  - Example: `mantle.order.OrderServices.get#OrderInfo` → `POST /rest/s1/mantle/order/OrderServices/get/OrderInfo`
-  - All parameters passed in JSON body
 - **Custom REST API**: Define in `*.rest.xml` files using resource/id structure (see rest-api-3.xsd)
   - `<resource name="parties">` → `/rest/{api-name}/parties`
   - `<id name="partyId">` → `/rest/{api-name}/parties/{partyId}` (path parameter)
   - `<resource name="contact">` → `/rest/{api-name}/parties/{partyId}/contact`
   - Body parameters from service in-parameters or entity fields
-- **ServiceRun UI**: http://localhost:8080/tools/Service/ServiceRun
+  - Example: `/rest/s1/mantle/parties` (custom REST API defined in mantle.rest.xml)
+- **ServiceRun UI**: http://localhost:8080/qapps/tools/Service/ServiceRun
 
 **Entity Query Patterns**:
 - **In Groovy scripts**: `ec.entity.find('mantle.product.Product').condition('productId', productId).one()`
@@ -171,17 +170,17 @@ When implementing or modifying services, follow this iterative workflow:
 
 1. **Implement/modify the service** in `service/*.xml` (with XML actions, inline Groovy, or script reference)
 
-2. **Test immediately via REST API** (no server restart needed for service changes):
+2. **Test immediately via REST API** (no server restart needed for service changes - changes take effect after a few seconds):
    ```bash
-   # Built-in service REST API (/rest/s1/)
+   # Custom REST API (services must be exposed via *.rest.xml)
    curl -X POST -H "Content-Type: application/json" \
         -u john.doe:moqui \
-        -d '{"orderId": "12345"}' \
-        http://localhost:8080/rest/s1/mantle/order/OrderServices/get/OrderInfo
+        -d '{"inputMessage": "test"}' \
+        http://localhost:8080/rest/s1/example/testAgent
    ```
    
    Or use the ServiceRun UI tool:
-   - Navigate to: http://localhost:8080/tools/Service/ServiceRun
+   - Navigate to: http://localhost:8080/qapps/tools/Service/ServiceRun
    - Enter service name: `mantle.order.OrderServices.get#OrderInfo`
    - Fill parameters and submit
 
@@ -213,25 +212,16 @@ When adding or modifying entities:
 
 3. **Test entity operations via REST API**:
    ```bash
-   # Find/list records
+   # Find/list records via custom REST API (e.g., mantle.rest.xml)
    curl -X GET -u john.doe:moqui \
-        http://localhost:8080/rest/e1/entityname
+        http://localhost:8080/rest/s1/mantle/parties
    
-   # Create a record
-   curl -X POST -H "Content-Type: application/json" \
-        -u john.doe:moqui \
-        -d '{"field1": "value1", "field2": "value2"}' \
-        http://localhost:8080/rest/e1/entityname
-   
-   # Update a record
-   curl -X PATCH -H "Content-Type: application/json" \
-        -u john.doe:moqui \
-        -d '{"field1": "updated"}' \
-        http://localhost:8080/rest/e1/entityname/ID_VALUE
+   # Note: Entity REST API (/rest/e1/) requires special permissions
+   # not granted by default to john.doe user
    ```
    
    Or use the EntityDataFind UI tool:
-   - Navigate to: http://localhost:8080/tools/Entity/DataEdit/EntityDataFind?selectedEntity=YourEntityName
+   - Navigate to: http://localhost:8080/qapps/tools/Entity/DataEdit/EntityDataFind?selectedEntity=YourEntityName
    - Search, create, edit, or delete records through the UI
 
 4. **Monitor server output** for:
@@ -267,12 +257,13 @@ When developing screens (XML widget system → FreeMarker macros → HTML):
 
 ### Key Testing Endpoints
 
-- **Service Runner UI**: http://localhost:8080/tools/Service/ServiceRun
-- **Entity Data Browser**: http://localhost:8080/tools/Entity/DataEdit/EntityDataFind
-- **Built-in Service REST**: `http://localhost:8080/rest/s1/{namespace}/{verb}/{noun}` (all services auto-exposed)
-- **Entity REST**: `http://localhost:8080/rest/e1/{entityname}` (CRUD operations on entities)
-- **Master Entity REST**: `http://localhost:8080/rest/m1/{entityname}` (entity with related records via relationships)
+- **Service Runner UI**: http://localhost:8080/qapps/tools/Service/ServiceRun
+- **Entity Data Browser**: http://localhost:8080/qapps/tools/Entity/DataEdit/EntityDataFind
 - **Custom REST APIs**: Defined in `*.rest.xml` files, paths follow resource/id structure
+  - Example: `http://localhost:8080/rest/s1/mantle/parties` (mantle.rest.xml)
+  - Example: `http://localhost:8080/rest/s1/example/examples` (example.rest.xml)
+- **Entity REST**: `http://localhost:8080/rest/e1/{entityname}` (CRUD operations - requires special permissions)
+- **Master Entity REST**: `http://localhost:8080/rest/m1/{entityname}` (entity with related records via relationships)
 
 ### Reading Server Output for Errors
 
