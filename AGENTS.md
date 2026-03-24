@@ -132,6 +132,12 @@ OpenSearch (for search/indexing), and Moqui itself.
 Start the server in the background and wait for it to be ready:
 
 ```bash
+# IMPORTANT: Stop any existing server first to avoid port conflicts
+pkill -f "gradlew run"
+# Also kill any java process using port 8080 (in case Gradle spawned it)
+kill $(ss -tlnp 2>/dev/null | grep :8080 | grep -oP 'pid=\K\d+' | head -1) 2>/dev/null || true
+sleep 2
+
 # Start server in background (output goes to /tmp/moqui-server.log)
 nohup ./gradlew run > /tmp/moqui-server.log 2>&1 &
 
@@ -166,6 +172,7 @@ ps aux | grep "gradlew run" | grep -v grep | awk '{print $2}' | xargs kill
 ```
 
 **Notes:**
+- **ALWAYS stop any existing server before starting** to avoid port 8080 conflicts
 - `./gradlew run` does NOT auto-start OpenSearch - start it manually first with
   `./gradlew startElasticSearch`
 - Server logs available in `/tmp/moqui-server.log` AND in `runtime/log/moqui.log`
