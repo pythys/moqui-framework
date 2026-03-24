@@ -117,7 +117,7 @@ OpenSearch (for search/indexing), and Moqui itself.
 
 **First-time setup** (one-time only):
 ```bash
-./gradlew downloadOpenSearch    # Downloads OpenSearch 3.4.0 to runtime/opensearch
+./gradlew downloadOpenSearch    # Downloads OpenSearch to runtime/opensearch
 ./gradlew startElasticSearch    # Start OpenSearch in daemon mode (stays running)
 ```
 
