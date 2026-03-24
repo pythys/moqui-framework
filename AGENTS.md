@@ -11,8 +11,7 @@ provide component-specific instructions, conventions, and workflows. When
 working within a specific component:
 
 1. **Check for component AGENTS.md**: Look for
-   `runtime/component/{component-name}/AGENTS.md` or
-   `runtime/base-component/{component-name}/AGENTS.md`
+   `runtime/component/{component-name}/AGENTS.md`
 2. **Component instructions override framework instructions**: If a component's
    AGENTS.md contradicts this file, follow the component-specific guidance
 3. **Component instructions supplement framework instructions**: Component
@@ -243,8 +242,8 @@ access. Service scripts go in `service/` or `src/main/resources/` (with
 `classpath://` location).
 
 **Service Naming**: Service file `service/mantle/order/OrderServices.xml`
-creates namespace `mantle.order.OrderServices`. Services defined as `<service
-verb="get" noun="OrderInfo">` are called as
+creates namespace `mantle.order.OrderServices`. Services defined as
+`<service verb="get" noun="OrderInfo">` are called as
 `mantle.order.OrderServices.get#OrderInfo`.
 
 **Three Ways to Access Services**:
