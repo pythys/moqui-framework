@@ -2,6 +2,28 @@
 
 Moqui is a business automation/ERP web framework with XML-based DSLs for entities, services, and screens. This file guides agents through feedback loop-driven development.
 
+## Quick Start Checklist
+
+Before starting development, verify these prerequisites:
+
+```bash
+# 1. OpenSearch running
+ps aux | grep opensearch | grep -v grep
+# Should show: java ...opensearch.bootstrap.OpenSearch
+
+# 2. Data loaded (check for demo data existence)
+ls -lh runtime/db/h2/moqui.mv.db
+# Should exist and be > 50MB after loading demo data
+
+# 3. Server ready (run after ./gradlew run)
+grep "Started oejs.ServerConnector.*8080" runtime/log/moqui.log | tail -1
+# Should show: Started oejs.ServerConnector@...{0.0.0.0:8080}
+
+# 4. Authentication working
+curl -u john.doe:moqui http://localhost:8080/rest/s1/mantle/parties
+# Should return JSON with partyIdList
+```
+
 ## Architecture
 
 - **Framework** (`framework/`): Core Java/Groovy APIs, low-level services, entities, screens
@@ -80,9 +102,24 @@ Moqui requires 3 servers to run: database (embedded H2 for development), OpenSea
 ./gradlew run
 ```
 
+**Verifying Server Startup**:
+
+The server typically takes 30-60 seconds to start. Monitor for this log message to confirm readiness:
+
+```bash
+# In the subagent output or runtime/log/moqui.log, look for:
+Started oejs.ServerConnector@...{HTTP/1.1, (http/1.1)}{0.0.0.0:8080}
+```
+
+This message confirms Jetty is listening on port 8080. After seeing this, test with:
+```bash
+curl -u john.doe:moqui http://localhost:8080/rest/s1/mantle/parties
+```
+
 **Notes:**
 - `./gradlew run` does NOT auto-start OpenSearch - start it manually first with `./gradlew startElasticSearch`
 - Server logs available in subagent output AND in `runtime/log/moqui.log`
+- If the server doesn't respond after seeing the log message, wait 5-10 more seconds for full initialization
 
 The server starts at http://localhost:8080 with default credentials: `john.doe` / `moqui` (super admin user created by demo data)
 
@@ -147,14 +184,26 @@ Services are always defined in `service/*.xml` and can be implemented in differe
 **Service Naming**: Service file `service/mantle/order/OrderServices.xml` creates namespace `mantle.order.OrderServices`. 
 Services defined as `<service verb="get" noun="OrderInfo">` are called as `mantle.order.OrderServices.get#OrderInfo`.
 
-**Accessing Services**:
-- **Custom REST API**: Define in `*.rest.xml` files using resource/id structure (see rest-api-3.xsd)
-  - `<resource name="parties">` → `/rest/{api-name}/parties`
-  - `<id name="partyId">` → `/rest/{api-name}/parties/{partyId}` (path parameter)
-  - `<resource name="contact">` → `/rest/{api-name}/parties/{partyId}/contact`
-  - Body parameters from service in-parameters or entity fields
-  - Example: `/rest/s1/mantle/parties` (custom REST API defined in mantle.rest.xml)
-- **ServiceRun UI**: http://localhost:8080/qapps/tools/Service/ServiceRun
+**Three Ways to Access Services**:
+
+1. **ServiceRun UI** (Recommended for development/testing):
+   - Test ANY service without modifying REST configuration
+   - Navigate to: http://localhost:8080/qapps/tools/Service/ServiceRun
+   - Enter service name: `mantle.order.OrderServices.get#OrderInfo`
+   - Fill parameters in the form and submit
+   - See results immediately
+
+2. **Custom REST API** (For production/integration):
+   - Define in `*.rest.xml` files using resource/id structure (see rest-api-3.xsd)
+   - `<resource name="parties">` → `/rest/{api-name}/parties`
+   - `<id name="partyId">` → `/rest/{api-name}/parties/{partyId}` (path parameter)
+   - `<resource name="contact">` → `/rest/{api-name}/parties/{partyId}/contact`
+   - Body parameters from service in-parameters or entity fields
+   - Example: `/rest/s1/mantle/parties` (custom REST API defined in mantle.rest.xml)
+   - **Note**: Services must be explicitly exposed in `*.rest.xml` to be callable via REST
+
+3. **Direct Service Call** (In Groovy/Java code):
+   - `ec.service.sync().name("mantle.order.OrderServices.get#OrderInfo").parameter("orderId", orderId).call()`
 
 **Entity Query Patterns**:
 - **In Groovy scripts**: `ec.entity.find('mantle.product.Product').condition('productId', productId).one()`
@@ -170,19 +219,23 @@ When implementing or modifying services, follow this iterative workflow:
 
 1. **Implement/modify the service** in `service/*.xml` (with XML actions, inline Groovy, or script reference)
 
-2. **Test immediately via REST API** (no server restart needed for service changes - changes take effect after a few seconds):
+2. **Test immediately** (no server restart needed for service changes - changes take effect after a few seconds):
+   
+   **Option A: ServiceRun UI** (Fastest - no REST config needed):
+   - Navigate to: http://localhost:8080/qapps/tools/Service/ServiceRun
+   - Enter service name: `mantle.order.OrderServices.get#OrderInfo`
+   - Fill parameters in the form and submit
+   - View results immediately in the UI
+   
+   **Option B: Custom REST API** (if service already exposed in `*.rest.xml`):
    ```bash
-   # Custom REST API (services must be exposed via *.rest.xml)
    curl -X POST -H "Content-Type: application/json" \
         -u john.doe:moqui \
         -d '{"inputMessage": "test"}' \
         http://localhost:8080/rest/s1/example/testAgent
    ```
    
-   Or use the ServiceRun UI tool:
-   - Navigate to: http://localhost:8080/qapps/tools/Service/ServiceRun
-   - Enter service name: `mantle.order.OrderServices.get#OrderInfo`
-   - Fill parameters and submit
+   **Note**: Wait 3-5 seconds after saving service changes for cache refresh before testing.
 
 3. **Monitor the server console output** from `./gradlew run` for:
    - Execution logs showing service calls
@@ -210,19 +263,21 @@ When adding or modifying entities:
    ./gradlew run
    ```
 
-3. **Test entity operations via REST API**:
+3. **Test entity operations**:
+   
+   **Option A: EntityDataFind UI** (Recommended - most visual and interactive):
+   - Navigate to: http://localhost:8080/qapps/tools/Entity/DataEdit/EntityDataFind?selectedEntity=YourEntityName
+   - Search, create, edit, or delete records through the UI
+   - Immediately see results and validation errors
+   
+   **Option B: Custom REST API** (if exposed in `*.rest.xml`):
    ```bash
    # Find/list records via custom REST API (e.g., mantle.rest.xml)
    curl -X GET -u john.doe:moqui \
         http://localhost:8080/rest/s1/mantle/parties
-   
-   # Note: Entity REST API (/rest/e1/) requires special permissions
-   # not granted by default to john.doe user
    ```
    
-   Or use the EntityDataFind UI tool:
-   - Navigate to: http://localhost:8080/qapps/tools/Entity/DataEdit/EntityDataFind?selectedEntity=YourEntityName
-   - Search, create, edit, or delete records through the UI
+   **Note**: Entity REST API (/rest/e1/) requires special permissions not granted by default to john.doe user
 
 4. **Monitor server output** for:
    - SQL statements being executed
@@ -257,13 +312,34 @@ When developing screens (XML widget system → FreeMarker macros → HTML):
 
 ### Key Testing Endpoints
 
+**UI Tools** (Recommended for development):
 - **Service Runner UI**: http://localhost:8080/qapps/tools/Service/ServiceRun
+  - Test ANY service by name without REST configuration
+  - Most flexible for iterative development
 - **Entity Data Browser**: http://localhost:8080/qapps/tools/Entity/DataEdit/EntityDataFind
-- **Custom REST APIs**: Defined in `*.rest.xml` files, paths follow resource/id structure
-  - Example: `http://localhost:8080/rest/s1/mantle/parties` (mantle.rest.xml)
-  - Example: `http://localhost:8080/rest/s1/example/examples` (example.rest.xml)
-- **Entity REST**: `http://localhost:8080/rest/e1/{entityname}` (CRUD operations - requires special permissions)
-- **Master Entity REST**: `http://localhost:8080/rest/m1/{entityname}` (entity with related records via relationships)
+  - Browse, create, edit, delete entity records visually
+  - Works with all entities regardless of permissions
+
+**REST APIs** (For programmatic access):
+
+Three types of REST APIs are available:
+
+1. **Custom REST API** (`/rest/s1/{api-name}/...` or `/rest/s2/...`):
+   - Services/entities MUST be explicitly defined in `*.rest.xml` files
+   - Provides custom resource paths (e.g., `/rest/s1/mantle/parties`)
+   - Example files: `mantle.rest.xml`, `example.rest.xml`
+   - Most common for agentic development
+   - Full access with john.doe credentials
+
+2. **Entity REST** (`/rest/e1/{entity.name}`):
+   - Direct CRUD operations on any entity
+   - Requires ENTITY_REST permissions (john.doe does NOT have these)
+   - Not recommended for agents - use EntityDataFind UI instead
+
+3. **Master Entity REST** (`/rest/m1/{entity.name}`):
+   - Returns entity with related records via relationships
+   - Same permissions as Entity REST (restricted)
+   - Useful when entity has master definition configured
 
 ### Reading Server Output for Errors
 
@@ -279,6 +355,94 @@ The server console output (`./gradlew run` stdout/stderr) shows all logging. Com
 Always read the full stack trace in the server output - Moqui provides detailed error context including the service call stack and entity operation details.
 
 The same logs are written to `runtime/log/moqui.log` if you need to search or review past output.
+
+## Troubleshooting
+
+### System State Verification
+
+Run these commands at any time to check system state:
+
+```bash
+# Check OpenSearch is running
+ps aux | grep opensearch | grep -v grep
+# Should show Java process with opensearch.bootstrap.OpenSearch
+
+# Check Moqui server is running and ready
+grep "Started oejs.ServerConnector.*8080" runtime/log/moqui.log | tail -1
+# Should show: Started oejs.ServerConnector@...{0.0.0.0:8080}
+
+# Check if data is loaded
+ls -lh runtime/db/h2/moqui.mv.db
+# Should be > 50MB if demo data loaded
+
+# Test authentication
+curl -u john.doe:moqui http://localhost:8080/rest/s1/mantle/parties
+# Should return JSON with partyIdList
+```
+
+### Common Issues
+
+**Server Won't Start**:
+```bash
+# 1. Check if OpenSearch is running
+ps aux | grep opensearch | grep -v grep
+
+# 2. If not running, start it
+./gradlew startElasticSearch
+
+# 3. Check if port 8080 is already in use
+lsof -i :8080
+# If occupied, kill the process or use different port
+
+# 4. Check server logs for errors
+tail -50 runtime/log/moqui.log
+```
+
+**Service Call Fails** (Decision Tree):
+- **404 Error** → Service not exposed in `*.rest.xml`, use ServiceRun UI instead
+- **403 Error** → Check service `authenticate` attribute and user permissions
+- **500 Error** → Check server logs for stack trace and error details
+- **Connection Refused** → Server not running, check with `grep ServerConnector runtime/log/moqui.log`
+
+**Service Changes Not Applying**:
+```bash
+# 1. Wait 5 seconds for service cache to refresh
+sleep 5
+
+# 2. Check for syntax errors in server logs
+tail -20 runtime/log/moqui.log | grep -i error
+
+# 3. Verify file was saved correctly
+grep "your-change-marker" path/to/YourService.xml
+```
+
+**Data Load Fails**:
+```bash
+# 1. Check for errors in gradle output
+./gradlew load 2>&1 | grep -i "error\|exception\|constraint"
+
+# 2. Common causes:
+#    - Foreign key violations (load seed before demo)
+#    - Duplicate primary keys
+#    - Invalid entity names (must be fully qualified)
+
+# 3. Load seed first, then demo
+./gradlew load -Ptypes=seed
+./gradlew load -Ptypes=demo
+```
+
+**Entity Changes Not Visible**:
+```bash
+# Entity changes REQUIRE server restart
+# 1. Stop server (terminate subagent task)
+# 2. Start server again: ./gradlew run
+# 3. Wait for: Started oejs.ServerConnector.*8080
+# 4. Test with EntityDataFind UI
+```
+
+**Can't Access Entity via REST**:
+- **Entity REST** (`/rest/e1/`) requires special permissions john.doe doesn't have
+- **Use instead**: EntityDataFind UI or Custom REST API (if exposed in `*.rest.xml`)
 
 ## Coding standards and criteria
 
