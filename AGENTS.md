@@ -35,7 +35,7 @@ ps aux | grep opensearch | grep -v grep
 ls -lh runtime/db/h2/moqui.mv.db
 # Should exist and be > 50MB after loading demo data
 
-# 3. Server ready (run after ./gradlew run)
+# 3. Server ready (run after starting server with java -jar moqui.war)
 grep "Started oejs.ServerConnector.*8080" runtime/log/moqui.log | tail -1
 # Should show: Started oejs.ServerConnector@...{0.0.0.0:8080}
 
@@ -120,16 +120,17 @@ Moqui requires 3 servers: database (embedded H2), OpenSearch, and Moqui itself.
 
 **Server lifecycle commands:**
 ```bash
-# Start (always stop first to avoid port conflicts)
-pkill -f "gradlew run"; kill -9 $(ss -tlnp 2>/dev/null | grep :8080 | grep -oP 'pid=\K\d+') 2>/dev/null; sleep 2
-nohup ./gradlew run > /tmp/moqui-server.log 2>&1 &
-# Wait: grep -q "Started.*8080" /tmp/moqui-server.log (or use strings if binary)
-
 # Stop
-pkill -f "gradlew run"; kill -9 $(ss -tlnp 2>/dev/null | grep :8080 | grep -oP 'pid=\K\d+') 2>/dev/null; sleep 2
+pkill -9 -f "java.*moqui.war"; sleep 2
+
+# Start
+nohup java -jar moqui.war > /tmp/moqui-server.log 2>&1 &
+# Wait: grep -q "Started.*8080" /tmp/moqui-server.log
 
 # Restart (required for: entity changes, configuration changes, SECA/EECA changes)
 # No restart needed for: service changes, screen changes, data file changes
+pkill -9 -f "java.*moqui.war"; sleep 2
+nohup java -jar moqui.war > /tmp/moqui-server.log 2>&1 &
 ```
 
 **Verify running:**
@@ -152,9 +153,19 @@ loaded and verified before testing.
   custom types (default for `./gradlew load`)
 
 **Loading Data**:
+
+**CRITICAL: The Moqui server MUST be stopped before loading data. Data loading will fail or cause database conflicts if the server is running.**
+
 ```bash
+# Stop server first
+pkill -9 -f "java.*moqui.war"; sleep 2
+
+# Then load data
 ./gradlew load              # Loads all data types (safest - handles dependencies)
 ./gradlew load -Ptypes=demo # Load only demo (requires other data to be loaded first)
+
+# Restart server after loading
+nohup java -jar moqui.war > /tmp/moqui-server.log 2>&1 &
 ```
 
 **Data File Format** - Use full entity names in component's `data/` directory:
@@ -168,12 +179,14 @@ loaded and verified before testing.
 
 **Data Development Workflow**:
 1. Create data XML in `component-name/data/*.xml` using full entity names
-2. Load data: `./gradlew load -Ptypes=demo` (or `./gradlew load` for all)
-3. Verify via REST (`curl -u john.doe:moqui
+2. **Stop the server** (required): `pkill -9 -f "java.*moqui.war"; sleep 2`
+3. Load data: `./gradlew load -Ptypes=demo` (or `./gradlew load` for all)
+4. **Restart the server**: `nohup java -jar moqui.war > /tmp/moqui-server.log 2>&1 &`
+5. Verify via REST (`curl -u john.doe:moqui
    http://localhost:8080/rest/s1/mantle/parties`) or EntityDataFind UI
-4. Monitor server output for parsing/constraint/foreign key errors
-5. Test service with loaded data
-6. Iterate: modify data files and reload until working
+6. Monitor server output for parsing/constraint/foreign key errors
+7. Test service with loaded data
+8. Iterate: modify data files and reload until working (repeat from step 2)
 
 **Ad-hoc Testing** (non-persistent):
 - **DataImport UI**: http://localhost:8080/qapps/tools/Entity/DataImport
@@ -438,7 +451,7 @@ Four types of REST APIs are available:
 
 ### Reading Server Output for Errors
 
-The server console output (`./gradlew run` stdout/stderr) shows all logging.
+The server console output (written to `/tmp/moqui-server.log`) shows all logging.
 Common error patterns:
 
 - **Service not found**: `Could not find service with name [...]` → Check
@@ -466,7 +479,7 @@ review past output.
 
 **Port 8080 conflict** (`Failed to bind`, `Address already in use`):
 ```bash
-pkill -f "gradlew run"; kill -9 $(ss -tlnp 2>/dev/null | grep :8080 | grep -oP 'pid=\K\d+') 2>/dev/null; sleep 2
+pkill -9 -f "java.*moqui.war"; sleep 2
 ```
 
 **OpenSearch not running**:
