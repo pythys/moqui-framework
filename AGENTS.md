@@ -118,27 +118,40 @@ Moqui requires 3 servers: database (embedded H2), OpenSearch, and Moqui itself.
 ./gradlew downloadOpenSearch startElasticSearch load
 ```
 
-**Server lifecycle commands:**
+**Server lifecycle commands** - Use these exact commands throughout development:
+
 ```bash
-# Stop
+# === STOP SERVER ===
 pkill -9 -f "java.*moqui.war"; sleep 2
 
-# Start
+# === START SERVER ===
 nohup java -jar moqui.war > /tmp/moqui-server.log 2>&1 &
-# Wait: grep -q "Started.*8080" /tmp/moqui-server.log
 
-# Restart (required for: entity changes, configuration changes, SECA/EECA changes)
+# Wait for startup (with timeout)
+for i in {1..40}; do
+  if grep -q "Started.*8080" /tmp/moqui-server.log 2>/dev/null; then
+    echo "Server started after $i seconds"
+    break
+  fi
+  sleep 1
+done
+
+# CRITICAL: Wait for warmup - server needs 5 seconds after "Started" message
+sleep 5
+
+# Verify running
+curl -s -u john.doe:moqui http://localhost:8080/rest/s1/mantle/parties
+
+# === RESTART SERVER ===
+# Use stop + start commands above
+# Required for: entity changes, configuration changes, SECA/EECA changes
 # No restart needed for: service changes, screen changes, data file changes
-pkill -9 -f "java.*moqui.war"; sleep 2
-nohup java -jar moqui.war > /tmp/moqui-server.log 2>&1 &
 ```
 
-**Verify running:**
-```bash
-curl -u john.doe:moqui http://localhost:8080/rest/s1/mantle/parties
-```
-
-Server at http://localhost:8080, credentials: `john.doe` / `moqui` (from demo data).
+**Server details:**
+- URL: http://localhost:8080
+- Credentials: `john.doe` / `moqui` (from demo data)
+- Log file: `/tmp/moqui-server.log`
 
 ### Data Management and Loading
 
@@ -154,18 +167,18 @@ loaded and verified before testing.
 
 **Loading Data**:
 
-**CRITICAL: The Moqui server MUST be stopped before loading data. Data loading will fail or cause database conflicts if the server is running.**
+**CRITICAL: The Moqui server MUST be stopped before loading data. Data loading
+will fail or cause database conflicts if the server is running.**
 
 ```bash
-# Stop server first
+# Stop server first (see "Server Management" section above)
 pkill -9 -f "java.*moqui.war"; sleep 2
 
 # Then load data
 ./gradlew load              # Loads all data types (safest - handles dependencies)
 ./gradlew load -Ptypes=demo # Load only demo (requires other data to be loaded first)
 
-# Restart server after loading
-nohup java -jar moqui.war > /tmp/moqui-server.log 2>&1 &
+# Restart server (use START SERVER commands from "Server Management" section above)
 ```
 
 **Data File Format** - Use full entity names in component's `data/` directory:
@@ -179,11 +192,11 @@ nohup java -jar moqui.war > /tmp/moqui-server.log 2>&1 &
 
 **Data Development Workflow**:
 1. Create data XML in `component-name/data/*.xml` using full entity names
-2. **Stop the server** (required): `pkill -9 -f "java.*moqui.war"; sleep 2`
+2. **Stop the server** (required): See "Server Management" section - STOP SERVER
 3. Load data: `./gradlew load -Ptypes=demo` (or `./gradlew load` for all)
-4. **Restart the server**: `nohup java -jar moqui.war > /tmp/moqui-server.log 2>&1 &`
-5. Verify via REST (`curl -u john.doe:moqui
-   http://localhost:8080/rest/s1/mantle/parties`) or EntityDataFind UI
+4. **Start the server**: See "Server Management" section - START SERVER
+   (includes startup wait and warmup)
+5. Verify via REST or EntityDataFind UI
 6. Monitor server output for parsing/constraint/foreign key errors
 7. Test service with loaded data
 8. Iterate: modify data files and reload until working (repeat from step 2)
@@ -226,8 +239,8 @@ access. Service scripts go in `service/` or `src/main/resources/` (with
 `classpath://` location).
 
 **Service Naming**: Service file `service/mantle/order/OrderServices.xml`
-creates namespace `mantle.order.OrderServices`. Services defined as
-`<service verb="get" noun="OrderInfo">` are called as
+creates namespace `mantle.order.OrderServices`. Services defined as `<service
+verb="get" noun="OrderInfo">` are called as
 `mantle.order.OrderServices.get#OrderInfo`.
 
 **Three Ways to Access Services**:
@@ -237,32 +250,36 @@ creates namespace `mantle.order.OrderServices`. Services defined as
 
    **Browser UI**:
    - Navigate to: http://localhost:8080/qapps/tools/Service/ServiceRun
-   - Enter service name: `org.moqui.impl.BasicServices.get#GeoRegionsForDropDown`
+   - Enter service name:
+     `org.moqui.impl.BasicServices.get#GeoRegionsForDropDown`
    - Fill parameters in the form and submit
    - See results immediately
 
    **Programmatic (curl)**:
    ```bash
    # Basic pattern - all parameters go in JSON body
-   curl -X POST -H "Content-Type: application/json" \
+   # Use -s flag to suppress curl progress output and get clean JSON
+   curl -s -X POST -H "Content-Type: application/json" \
         -u john.doe:moqui \
         -d '{"serviceName": "service.path.verb#Noun", "param1": "value1", "param2": "value2"}' \
         http://localhost:8080/apps/tools/Service/ServiceRun/runJson
 
    # Example: Get geo regions with parameters
-   curl -X POST -H "Content-Type: application/json" \
+   curl -s -X POST -H "Content-Type: application/json" \
         -u john.doe:moqui \
         -d '{"serviceName": "org.moqui.impl.BasicServices.get#GeoRegionsForDropDown", "geoId": "USA"}' \
         http://localhost:8080/apps/tools/Service/ServiceRun/runJson
 
    # Example: Service with no parameters (noop)
-   curl -X POST -H "Content-Type: application/json" \
+   curl -s -X POST -H "Content-Type: application/json" \
         -u john.doe:moqui \
         -d '{"serviceName": "org.moqui.impl.BasicServices.noop"}' \
         http://localhost:8080/apps/tools/Service/ServiceRun/runJson
    ```
 
-   **Note**: The `runJson` endpoint accepts ANY service name and returns JSON responses - perfect for testing and automation without creating custom REST definitions.
+   **Note**: The `runJson` endpoint accepts ANY service name and returns JSON
+   responses - perfect for testing and automation without creating custom REST
+   definitions.
 
 2. **Custom REST API** (For production/integration):
    - Define in `*.rest.xml` files using resource/id structure (see
@@ -303,11 +320,13 @@ When implementing or modifying services, follow this iterative workflow:
 
    **Option A: ServiceRun UI** (Fastest - no REST config needed):
    - Navigate to: http://localhost:8080/qapps/tools/Service/ServiceRun
-   - Enter service name: `org.moqui.impl.BasicServices.get#GeoRegionsForDropDown`
+   - Enter service name:
+     `org.moqui.impl.BasicServices.get#GeoRegionsForDropDown`
    - Fill parameters in the form and submit
    - View results immediately in the UI
 
-   **Option A (Programmatic)**: Use the `runJson` endpoint (see "Three Ways to Access Services" above for curl examples)
+   **Option A (Programmatic)**: Use the `runJson` endpoint (see "Three Ways to
+   Access Services" above for curl examples)
 
    **Option B: Custom REST API** (if service already exposed in `*.rest.xml`):
    ```bash
@@ -342,7 +361,8 @@ When implementing or modifying services, follow this iterative workflow:
    - Parameter validation failures
    - Transaction issues
    - SQL errors for entity operations
-   - **Note**: Successful service calls typically don't generate detailed logs in production mode
+   - **Note**: Successful service calls typically don't generate detailed logs
+     in production mode
 
 4. **Examine the response**:
    - Check the JSON response from curl for service output parameters
@@ -355,7 +375,8 @@ When implementing or modifying services, follow this iterative workflow:
 
 When adding or modifying entities:
 1. **Define/modify entity** in `entity/*.xml` files
-2. **Restart the server** (entity definition changes require restart - see "When to Restart the Server" section above)
+2. **Restart the server** (entity definition changes require restart - see "When
+   to Restart the Server" section above)
 3. **Test entity operations**:
 
    **Option A: EntityDataFind UI** (Recommended - most visual and interactive):
@@ -451,8 +472,8 @@ Four types of REST APIs are available:
 
 ### Reading Server Output for Errors
 
-The server console output (written to `/tmp/moqui-server.log`) shows all logging.
-Common error patterns:
+The server console output (written to `/tmp/moqui-server.log`) shows all
+logging. Common error patterns:
 
 - **Service not found**: `Could not find service with name [...]` → Check
   service name spelling and path
@@ -479,6 +500,7 @@ review past output.
 
 **Port 8080 conflict** (`Failed to bind`, `Address already in use`):
 ```bash
+# See "Server Management" section - STOP SERVER
 pkill -9 -f "java.*moqui.war"; sleep 2
 ```
 
@@ -497,7 +519,8 @@ ps aux | grep opensearch | grep -v grep  # Verify
 - 403 → Check permissions
 - 500 → Check `tail runtime/log/moqui.log`
 
-**Data load fails**: Server must be stopped first.
+**Data load fails**: Server must be stopped first (see Server Management
+section).
 
 ## Coding standards and criteria
 
