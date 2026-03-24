@@ -129,35 +129,46 @@ OpenSearch (for search/indexing), and Moqui itself.
 
 **Starting the Moqui server:**
 
-**IMPORTANT**: Run the Moqui server in a subagent (using the Task tool with
-general agent) so it runs in the background and can be easily stopped by
-terminating the subagent task. This keeps server logs isolated and makes process
-management simple.
+Start the server in the background and wait for it to be ready:
 
 ```bash
-# In subagent - this blocks and keeps running
-./gradlew run
+# Start server in background (output goes to /tmp/moqui-server.log)
+nohup ./gradlew run > /tmp/moqui-server.log 2>&1 &
+
+# Wait for server to be ready (typically 30-60 seconds)
+for i in {1..60}; do
+  if grep -q "Started oejs.ServerConnector.*8080" /tmp/moqui-server.log 2>/dev/null; then
+    echo "Server is ready!"
+    break
+  fi
+  sleep 1
+done
 ```
 
-**Verifying Server Startup**:
-
-The server typically takes 30-60 seconds to start. Monitor for this log message
-to confirm readiness:
+**Verifying Server is Running**:
 
 ```bash
-# In the subagent output or runtime/log/moqui.log, look for:
-Started oejs.ServerConnector@...{HTTP/1.1, (http/1.1)}{0.0.0.0:8080}
-```
-
-This message confirms Jetty is listening on port 8080. After seeing this, test with:
-```bash
+# Test with a simple REST call
 curl -u john.doe:moqui http://localhost:8080/rest/s1/mantle/parties
+
+# Or check the log for the startup message
+grep "Started oejs.ServerConnector.*8080" /tmp/moqui-server.log
+```
+
+**Stopping the Server**:
+
+```bash
+# Find and kill the Gradle process
+pkill -f "gradlew run"
+
+# Or find the specific PID
+ps aux | grep "gradlew run" | grep -v grep | awk '{print $2}' | xargs kill
 ```
 
 **Notes:**
 - `./gradlew run` does NOT auto-start OpenSearch - start it manually first with
   `./gradlew startElasticSearch`
-- Server logs available in subagent output AND in `runtime/log/moqui.log`
+- Server logs available in `/tmp/moqui-server.log` AND in `runtime/log/moqui.log`
 - If the server doesn't respond after seeing the log message, wait 5-10 more
   seconds for full initialization
 
@@ -183,7 +194,7 @@ loaded and verified before testing.
 **Loading Data**:
 ```bash
 ./gradlew load              # Loads all data types (safest - handles dependencies)
-./gradlew load -Ptypes=demo # Load only demo (requires seed to be loaded first)
+./gradlew load -Ptypes=demo # Load only demo (requires other data to be loaded first)
 ```
 
 **Data File Format** - Use full entity names in component's `data/` directory:
@@ -250,10 +261,35 @@ creates namespace `mantle.order.OrderServices`. Services defined as
 
 1. **ServiceRun UI** (Recommended for development/testing):
    - Test ANY service without modifying REST configuration
+
+   **Browser UI**:
    - Navigate to: http://localhost:8080/qapps/tools/Service/ServiceRun
-   - Enter service name: `mantle.order.OrderServices.get#OrderInfo`
+   - Enter service name: `org.moqui.impl.BasicServices.get#GeoRegionsForDropDown`
    - Fill parameters in the form and submit
    - See results immediately
+
+   **Programmatic (curl)**:
+   ```bash
+   # Basic pattern - all parameters go in JSON body
+   curl -X POST -H "Content-Type: application/json" \
+        -u john.doe:moqui \
+        -d '{"serviceName": "service.path.verb#Noun", "param1": "value1", "param2": "value2"}' \
+        http://localhost:8080/apps/tools/Service/ServiceRun/runJson
+
+   # Example: Get geo regions with parameters
+   curl -X POST -H "Content-Type: application/json" \
+        -u john.doe:moqui \
+        -d '{"serviceName": "org.moqui.impl.BasicServices.get#GeoRegionsForDropDown", "geoId": "USA"}' \
+        http://localhost:8080/apps/tools/Service/ServiceRun/runJson
+
+   # Example: Service with no parameters (noop)
+   curl -X POST -H "Content-Type: application/json" \
+        -u john.doe:moqui \
+        -d '{"serviceName": "org.moqui.impl.BasicServices.noop"}' \
+        http://localhost:8080/apps/tools/Service/ServiceRun/runJson
+   ```
+
+   **Note**: The `runJson` endpoint accepts ANY service name and returns JSON responses - perfect for testing and automation without creating custom REST definitions.
 
 2. **Custom REST API** (For production/integration):
    - Define in `*.rest.xml` files using resource/id structure (see
@@ -291,13 +327,15 @@ When implementing or modifying services, follow this iterative workflow:
 
 2. **Test immediately** (no server restart needed for service changes - changes
    take effect after a few seconds):
-   
+
    **Option A: ServiceRun UI** (Fastest - no REST config needed):
    - Navigate to: http://localhost:8080/qapps/tools/Service/ServiceRun
-   - Enter service name: `mantle.order.OrderServices.get#OrderInfo`
+   - Enter service name: `org.moqui.impl.BasicServices.get#GeoRegionsForDropDown`
    - Fill parameters in the form and submit
    - View results immediately in the UI
-   
+
+   **Option A (Programmatic)**: Use the `runJson` endpoint (see "Three Ways to Access Services" above for curl examples)
+
    **Option B: Custom REST API** (if service already exposed in `*.rest.xml`):
    ```bash
    curl -X POST -H "Content-Type: application/json" \
@@ -305,15 +343,33 @@ When implementing or modifying services, follow this iterative workflow:
         -d '{"inputMessage": "test"}' \
         http://localhost:8080/rest/s1/example/testAgent
    ```
-   
+
    **Note**: Wait 3-5 seconds after saving service changes for cache refresh
    before testing.
 
-3. **Monitor the server console output** from `./gradlew run` for:
-   - Execution logs showing service calls
-   - Error messages and stack traces
+3. **Monitor the server output** for errors and execution details:
+
+   ```bash
+   # Check server logs for errors (successful calls may not log in production mode)
+   tail -30 /tmp/moqui-server.log
+
+   # Or check the runtime log file
+   tail -30 runtime/log/moqui.log
+
+   # To observe both service response AND logs in one command:
+   curl -X POST -H "Content-Type: application/json" \
+        -u john.doe:moqui \
+        -d '{"serviceName": "org.moqui.impl.BasicServices.get#GeoRegionsForDropDown", "geoId": "USA"}' \
+        http://localhost:8080/apps/tools/Service/ServiceRun/runJson \
+        && echo "" && echo "=== Checking logs ===" && tail -20 /tmp/moqui-server.log
+   ```
+
+   **What to look for in logs**:
+   - Error messages and stack traces (logged with ERROR or WARN level)
    - Parameter validation failures
    - Transaction issues
+   - SQL errors for entity operations
+   - **Note**: Successful service calls typically don't generate detailed logs in production mode
 
 4. **Examine the response**:
    - Check the JSON response from curl for service output parameters
@@ -330,26 +386,37 @@ When adding or modifying entities:
 
 2. **Restart the server** (entity definition changes require restart):
    ```bash
-   # Stop the running server (terminate subagent task)
-   # Then start it again in a new subagent
-   ./gradlew run
+   # Stop the running server
+   pkill -f "gradlew run"
+
+   # Start it again in background
+   nohup ./gradlew run > /tmp/moqui-server.log 2>&1 &
+
+   # Wait for server to be ready
+   for i in {1..60}; do
+     if grep -q "Started oejs.ServerConnector.*8080" /tmp/moqui-server.log 2>/dev/null; then
+       echo "Server is ready!"
+       break
+     fi
+     sleep 1
+   done
    ```
 
 3. **Test entity operations**:
-   
+
    **Option A: EntityDataFind UI** (Recommended - most visual and interactive):
    - Navigate to:
      http://localhost:8080/qapps/tools/Entity/DataEdit/EntityDataFind?selectedEntity=YourEntityName
    - Search, create, edit, or delete records through the UI
    - Immediately see results and validation errors
-   
+
    **Option B: Custom REST API** (if exposed in `*.rest.xml`):
    ```bash
    # Find/list records via custom REST API (e.g., mantle.rest.xml)
    curl -X GET -u john.doe:moqui \
         http://localhost:8080/rest/s1/mantle/parties
    ```
-   
+
    **Note**: Entity REST API (/rest/e1/) requires special permissions not
    granted by default to john.doe user
 
@@ -402,7 +469,21 @@ When developing screens (XML widget system → FreeMarker macros → HTML):
 
 **REST APIs** (For programmatic access):
 
-Three types of REST APIs are available:
+Four types of REST APIs are available:
+
+0. **ServiceRun JSON API** (`/apps/tools/Service/ServiceRun/runJson`):
+   - Test ANY service programmatically without REST configuration
+   - Pass service name and parameters in JSON body
+   - Returns JSON response from service
+   - Example curl:
+     ```bash
+     curl -X POST -H "Content-Type: application/json" \
+          -u john.doe:moqui \
+          -d '{"serviceName": "org.moqui.impl.BasicServices.get#GeoRegionsForDropDown", "geoId": "USA"}' \
+          http://localhost:8080/apps/tools/Service/ServiceRun/runJson
+     ```
+   - Most flexible for agentic development and testing
+   - Full access with john.doe credentials
 
 1. **Custom REST API** (`/rest/s1/{api-name}/...` or `/rest/s2/...`):
    - Services/entities MUST be explicitly defined in `*.rest.xml` files
@@ -524,9 +605,21 @@ grep "your-change-marker" path/to/YourService.xml
 **Entity Changes Not Visible**:
 ```bash
 # Entity changes REQUIRE server restart
-# 1. Stop server (terminate subagent task)
-# 2. Start server again: ./gradlew run
+# 1. Stop server
+pkill -f "gradlew run"
+
+# 2. Start server again in background
+nohup ./gradlew run > /tmp/moqui-server.log 2>&1 &
+
 # 3. Wait for: Started oejs.ServerConnector.*8080
+for i in {1..60}; do
+  if grep -q "Started oejs.ServerConnector.*8080" /tmp/moqui-server.log 2>/dev/null; then
+    echo "Server is ready!"
+    break
+  fi
+  sleep 1
+done
+
 # 4. Test with EntityDataFind UI
 ```
 
