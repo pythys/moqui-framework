@@ -2,6 +2,16 @@
 
 Moqui is a business automation/ERP web framework with XML-based DSLs for entities, services, and screens. This file guides agents through feedback loop-driven development.
 
+## Component-Specific Instructions
+
+**IMPORTANT**: Individual components may have their own `AGENTS.md` files that provide component-specific instructions, conventions, and workflows. When working within a specific component:
+
+1. **Check for component AGENTS.md**: Look for `runtime/component/{component-name}/AGENTS.md` or `runtime/base-component/{component-name}/AGENTS.md`
+2. **Component instructions override framework instructions**: If a component's AGENTS.md contradicts this file, follow the component-specific guidance
+3. **Component instructions supplement framework instructions**: Component AGENTS.md files may add additional context, data models, workflows, or conventions specific to that component
+
+Example: If working in `runtime/component/mantle-udm/`, check for `runtime/component/mantle-udm/AGENTS.md` for entity relationship guidance, naming conventions, or data model patterns specific to the Universal Data Model.
+
 ## Quick Start Checklist
 
 Before starting development, verify these prerequisites:
