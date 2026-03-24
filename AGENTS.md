@@ -125,7 +125,8 @@ Moqui requires 3 servers: database (embedded H2), OpenSearch, and Moqui itself.
 pkill -9 -f "java.*moqui.war"; sleep 2
 
 # === START SERVER ===
-nohup java -jar moqui.war > /tmp/moqui-server.log 2>&1 &
+echo "=== SERVER START - $(date) ===" > /tmp/moqui-server.log
+nohup java -jar moqui.war >> /tmp/moqui-server.log 2>&1 &
 
 # Wait for startup (with timeout)
 for i in {1..40}; do
