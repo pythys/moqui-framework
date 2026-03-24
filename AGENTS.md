@@ -1,16 +1,27 @@
 # AGENTS
 
-Moqui is a business automation/ERP web framework with XML-based DSLs for entities, services, and screens. This file guides agents through feedback loop-driven development.
+Moqui is a business automation/ERP web framework with XML-based DSLs for
+entities, services, and screens. This file guides agents through feedback
+loop-driven development.
 
 ## Component-Specific Instructions
 
-**IMPORTANT**: Individual components may have their own `AGENTS.md` files that provide component-specific instructions, conventions, and workflows. When working within a specific component:
+**IMPORTANT**: Individual components may have their own `AGENTS.md` files that
+provide component-specific instructions, conventions, and workflows. When
+working within a specific component:
 
-1. **Check for component AGENTS.md**: Look for `runtime/component/{component-name}/AGENTS.md` or `runtime/base-component/{component-name}/AGENTS.md`
-2. **Component instructions override framework instructions**: If a component's AGENTS.md contradicts this file, follow the component-specific guidance
-3. **Component instructions supplement framework instructions**: Component AGENTS.md files may add additional context, data models, workflows, or conventions specific to that component
+1. **Check for component AGENTS.md**: Look for
+   `runtime/component/{component-name}/AGENTS.md` or
+   `runtime/base-component/{component-name}/AGENTS.md`
+2. **Component instructions override framework instructions**: If a component's
+   AGENTS.md contradicts this file, follow the component-specific guidance
+3. **Component instructions supplement framework instructions**: Component
+   AGENTS.md files may add additional context, data models, workflows, or
+   conventions specific to that component
 
-Example: If working in `runtime/component/mantle-udm/`, check for `runtime/component/mantle-udm/AGENTS.md` for entity relationship guidance, naming conventions, or data model patterns specific to the Universal Data Model.
+Example: If working in `runtime/component/mantle-udm/`, check for
+`runtime/component/mantle-udm/AGENTS.md` for entity relationship guidance,
+naming conventions, or data model patterns specific to the Universal Data Model.
 
 ## Quick Start Checklist
 
@@ -36,13 +47,19 @@ curl -u john.doe:moqui http://localhost:8080/rest/s1/mantle/parties
 
 ## Architecture
 
-- **Framework** (`framework/`): Core Java/Groovy APIs, low-level services, entities, screens
-- **Runtime** (`runtime/`): Configuration, templates, base components (tools, webroot)
-- **Components** (`runtime/component/`): All components are optional, but most projects have at minimum:
-  - `mantle-udm`: Universal Data Model - rich entity definitions (check here first for entities)
-  - `mantle-usl`: Universal Service Library - business logic services (check here first for services)
+- **Framework** (`framework/`): Core Java/Groovy APIs, low-level services,
+  entities, screens
+- **Runtime** (`runtime/`): Configuration, templates, base components (tools,
+  webroot)
+- **Components** (`runtime/component/`): All components are optional, but most
+  projects have at minimum:
+  - `mantle-udm`: Universal Data Model - rich entity definitions (check here
+    first for entities)
+  - `mantle-usl`: Universal Service Library - business logic services (check
+    here first for services)
 
-Component structure: `entity/`, `service/`, `screen/`, `template/`, `data/`, `src/`
+Component structure: `entity/`, `service/`, `screen/`, `template/`, `data/`,
+`src/`
 
 ## Core APIs
 
@@ -63,18 +80,22 @@ Access everything via ExecutionContext (`ec`):
 
 ## DSLs
 
-All DSLs use XML with XSDs in `framework/xsd/`. The framework-catalog.xml maps public URLs to local schemas for validation.
+All DSLs use XML with XSDs in `framework/xsd/`. The framework-catalog.xml maps
+public URLs to local schemas for validation.
 
 ### Core DSLs (most frequently used):
 - **entity-definition-3.xsd**: Entity definitions (`entity/*.xml`)
 - **service-definition-3.xsd**: Service definitions (`service/*.xml`)
 - **xml-screen-3.xsd**: Screen definitions (`screen/*.xml`)
-- **xml-form-3.xsd**: Form widgets (`form-single`, `form-list`) - embedded in screens
-- **xml-actions-3.xsd**: Action scripts - embedded in services/screens, or standalone script files
+- **xml-form-3.xsd**: Form widgets (`form-single`, `form-list`) - embedded in
+  screens
+- **xml-actions-3.xsd**: Action scripts - embedded in services/screens, or
+  standalone script files
 
 ### Event-Condition-Action (ECA) Rules:
 - **entity-eca-3.xsd**: Entity ECAs - triggers on entity CRUD operations
-- **service-eca-3.xsd**: Service ECAs - triggers before/after service calls (SECAs)
+- **service-eca-3.xsd**: Service ECAs - triggers before/after service calls
+  (SECAs)
 - **email-eca-3.xsd**: Email ECAs - triggers for email events (EECAs)
 
 ### Configuration & Integration:
@@ -84,11 +105,15 @@ All DSLs use XML with XSDs in `framework/xsd/`. The framework-catalog.xml maps p
 
 ## Agentic Development Workflow (Feedback Loop-Driven)
 
-**CRITICAL**: Agents must establish continuous feedback loops when developing Moqui code. The server must be started by the agent, and implementations should be tested iteratively by calling services/querying entities and monitoring server output until the code truly works.
+**CRITICAL**: Agents must establish continuous feedback loops when developing
+Moqui code. The server must be started by the agent, and implementations should
+be tested iteratively by calling services/querying entities and monitoring
+server output until the code truly works.
 
 ### Initial Setup and Server Start
 
-Moqui requires 3 servers to run: database (embedded H2 for development), OpenSearch (for search/indexing), and Moqui itself.
+Moqui requires 3 servers to run: database (embedded H2 for development),
+OpenSearch (for search/indexing), and Moqui itself.
 
 **First-time setup** (one-time only):
 ```bash
@@ -105,7 +130,10 @@ Moqui requires 3 servers to run: database (embedded H2 for development), OpenSea
 
 **Starting the Moqui server:**
 
-**IMPORTANT**: Run the Moqui server in a subagent (using the Task tool with general agent) so it runs in the background and can be easily stopped by terminating the subagent task. This keeps server logs isolated and makes process management simple.
+**IMPORTANT**: Run the Moqui server in a subagent (using the Task tool with
+general agent) so it runs in the background and can be easily stopped by
+terminating the subagent task. This keeps server logs isolated and makes process
+management simple.
 
 ```bash
 # In subagent - this blocks and keeps running
@@ -114,7 +142,8 @@ Moqui requires 3 servers to run: database (embedded H2 for development), OpenSea
 
 **Verifying Server Startup**:
 
-The server typically takes 30-60 seconds to start. Monitor for this log message to confirm readiness:
+The server typically takes 30-60 seconds to start. Monitor for this log message
+to confirm readiness:
 
 ```bash
 # In the subagent output or runtime/log/moqui.log, look for:
@@ -127,22 +156,30 @@ curl -u john.doe:moqui http://localhost:8080/rest/s1/mantle/parties
 ```
 
 **Notes:**
-- `./gradlew run` does NOT auto-start OpenSearch - start it manually first with `./gradlew startElasticSearch`
+- `./gradlew run` does NOT auto-start OpenSearch - start it manually first with
+  `./gradlew startElasticSearch`
 - Server logs available in subagent output AND in `runtime/log/moqui.log`
-- If the server doesn't respond after seeing the log message, wait 5-10 more seconds for full initialization
+- If the server doesn't respond after seeing the log message, wait 5-10 more
+  seconds for full initialization
 
-The server starts at http://localhost:8080 with default credentials: `john.doe` / `moqui` (super admin user created by demo data)
+The server starts at http://localhost:8080 with default credentials: `john.doe`
+/ `moqui` (super admin user created by demo data)
 
-**Authentication**: Most curl examples require basic authentication with `-u john.doe:moqui` unless otherwise noted. This user is only available after loading demo data (`./gradlew load` includes demo data by default).
+**Authentication**: Most curl examples require basic authentication with `-u
+john.doe:moqui` unless otherwise noted. This user is only available after
+loading demo data (`./gradlew load` includes demo data by default).
 
 ### Data Management and Loading
 
-**CRITICAL**: Services and entities require test data to function. Data must be loaded and verified before testing.
+**CRITICAL**: Services and entities require test data to function. Data must be
+loaded and verified before testing.
 
 **Data Types** (specified in XML root element `<entity-facade-xml type="...">`):
-- **seed**: Core data required for system operation (users, security, configuration). Load before demo.
+- **seed**: Core data required for system operation (users, security,
+  configuration). Load before demo.
 - **demo**: Test/demonstration data for development
-- **all**: All data types including seed, demo, seed-initial, install, and any custom types (default for `./gradlew load`)
+- **all**: All data types including seed, demo, seed-initial, install, and any
+  custom types (default for `./gradlew load`)
 
 **Loading Data**:
 ```bash
@@ -162,37 +199,54 @@ The server starts at http://localhost:8080 with default credentials: `john.doe` 
 **Data Development Workflow**:
 1. Create data XML in `component-name/data/*.xml` using full entity names
 2. Load data: `./gradlew load -Ptypes=demo` (or `./gradlew load` for all)
-3. Verify via REST (`curl -u john.doe:moqui http://localhost:8080/rest/s1/mantle/parties`) or EntityDataFind UI
+3. Verify via REST (`curl -u john.doe:moqui
+   http://localhost:8080/rest/s1/mantle/parties`) or EntityDataFind UI
 4. Monitor server output for parsing/constraint/foreign key errors
 5. Test service with loaded data
 6. Iterate: modify data files and reload until working
 
 **Ad-hoc Testing** (non-persistent):
-- **DataImport UI**: http://localhost:8080/qapps/tools/Entity/DataImport (XML/JSON/CSV text input)
-- **EntityDataFind UI**: http://localhost:8080/qapps/tools/Entity/DataEdit/EntityDataFind (create/edit records)
-- **REST API**: Direct entity manipulation requires authorization permissions not granted by default to john.doe
+- **DataImport UI**: http://localhost:8080/qapps/tools/Entity/DataImport
+  (XML/JSON/CSV text input)
+- **EntityDataFind UI**:
+  http://localhost:8080/qapps/tools/Entity/DataEdit/EntityDataFind (create/edit
+  records)
+- **REST API**: Direct entity manipulation requires authorization permissions
+  not granted by default to john.doe
 
-**Important**: Data loads are transactional (errors rollback entire file). Use `type="demo"` for test data, `type="seed"` for required system data.
+**Important**: Data loads are transactional (errors rollback entire file). Use
+`type="demo"` for test data, `type="seed"` for required system data.
 
 ### Service Development Feedback Loop
 
 **Service Implementation Approaches**:
 
-Services are always defined in `service/*.xml` and can be implemented in different ways:
-- **XML actions** (most common): Service logic in `<actions>` block using XML DSL
-- **Inline Groovy**: Groovy code in `<script><![CDATA[...]]></script>` blocks within XML
-- **External Groovy script**: `type="script" location="component://component-name/service/path/script.groovy"`
+Services are always defined in `service/*.xml` and can be implemented in
+different ways:
+- **XML actions** (most common): Service logic in `<actions>` block using XML
+  DSL
+- **Inline Groovy**: Groovy code in `<script><![CDATA[...]]></script>` blocks
+  within XML
+- **External Groovy script**: `type="script"
+  location="component://component-name/service/path/script.groovy"`
   - Script file lives in `service/` directory alongside XML definitions
   - Has full ExecutionContext (`ec`) access, transaction management, etc.
-  - Example: `location="component://mantle-usl/service/mantle/party/PartyServices/findParty.groovy"`
-- **External Java/Groovy class**: Referenced from XML, implemented as compiled classes
+  - Example:
+    `location="component://mantle-usl/service/mantle/party/PartyServices/findParty.groovy"`
+- **External Java/Groovy class**: Referenced from XML, implemented as compiled
+  classes
   - Must implement ServiceRunner interface or similar
   - Used for framework extensions, not typical business logic
 
-**Important**: The `src/` directory is for compiled Java/Groovy classes (infrastructure, facades, runners) that do NOT have automatic ExecutionContext access. Service scripts go in `service/` or `src/main/resources/` (with `classpath://` location).
+**Important**: The `src/` directory is for compiled Java/Groovy classes
+(infrastructure, facades, runners) that do NOT have automatic ExecutionContext
+access. Service scripts go in `service/` or `src/main/resources/` (with
+`classpath://` location).
 
-**Service Naming**: Service file `service/mantle/order/OrderServices.xml` creates namespace `mantle.order.OrderServices`. 
-Services defined as `<service verb="get" noun="OrderInfo">` are called as `mantle.order.OrderServices.get#OrderInfo`.
+**Service Naming**: Service file `service/mantle/order/OrderServices.xml`
+creates namespace `mantle.order.OrderServices`. Services defined as `<service
+verb="get" noun="OrderInfo">` are called as
+`mantle.order.OrderServices.get#OrderInfo`.
 
 **Three Ways to Access Services**:
 
@@ -204,19 +258,26 @@ Services defined as `<service verb="get" noun="OrderInfo">` are called as `mantl
    - See results immediately
 
 2. **Custom REST API** (For production/integration):
-   - Define in `*.rest.xml` files using resource/id structure (see rest-api-3.xsd)
+   - Define in `*.rest.xml` files using resource/id structure (see
+     rest-api-3.xsd)
    - `<resource name="parties">` → `/rest/{api-name}/parties`
-   - `<id name="partyId">` → `/rest/{api-name}/parties/{partyId}` (path parameter)
+   - `<id name="partyId">` → `/rest/{api-name}/parties/{partyId}` (path
+     parameter)
    - `<resource name="contact">` → `/rest/{api-name}/parties/{partyId}/contact`
    - Body parameters from service in-parameters or entity fields
-   - Example: `/rest/s1/mantle/parties` (custom REST API defined in mantle.rest.xml)
-   - **Note**: Services must be explicitly exposed in `*.rest.xml` to be callable via REST
+   - Example: `/rest/s1/mantle/parties` (custom REST API defined in
+     mantle.rest.xml)
+   - **Note**: Services must be explicitly exposed in `*.rest.xml` to be
+     callable via REST
 
 3. **Direct Service Call** (In Groovy/Java code):
-   - `ec.service.sync().name("mantle.order.OrderServices.get#OrderInfo").parameter("orderId", orderId).call()`
+   - `ec.service.sync().name("mantle.order.OrderServices.get#OrderInfo").parameter("orderId",
+     orderId).call()`
 
 **Entity Query Patterns**:
-- **In Groovy scripts**: `ec.entity.find('mantle.product.Product').condition('productId', productId).one()`
+- **In Groovy scripts**:
+  `ec.entity.find('mantle.product.Product').condition('productId',
+  productId).one()`
 - **In XML (actions DSL)**: 
   ```xml
   <entity-find-one entity-name="mantle.product.Product" value-field="product"/>
@@ -227,9 +288,11 @@ Services defined as `<service verb="get" noun="OrderInfo">` are called as `mantl
 
 When implementing or modifying services, follow this iterative workflow:
 
-1. **Implement/modify the service** in `service/*.xml` (with XML actions, inline Groovy, or script reference)
+1. **Implement/modify the service** in `service/*.xml` (with XML actions, inline
+   Groovy, or script reference)
 
-2. **Test immediately** (no server restart needed for service changes - changes take effect after a few seconds):
+2. **Test immediately** (no server restart needed for service changes - changes
+   take effect after a few seconds):
    
    **Option A: ServiceRun UI** (Fastest - no REST config needed):
    - Navigate to: http://localhost:8080/qapps/tools/Service/ServiceRun
@@ -245,7 +308,8 @@ When implementing or modifying services, follow this iterative workflow:
         http://localhost:8080/rest/s1/example/testAgent
    ```
    
-   **Note**: Wait 3-5 seconds after saving service changes for cache refresh before testing.
+   **Note**: Wait 3-5 seconds after saving service changes for cache refresh
+   before testing.
 
 3. **Monitor the server console output** from `./gradlew run` for:
    - Execution logs showing service calls
@@ -276,7 +340,8 @@ When adding or modifying entities:
 3. **Test entity operations**:
    
    **Option A: EntityDataFind UI** (Recommended - most visual and interactive):
-   - Navigate to: http://localhost:8080/qapps/tools/Entity/DataEdit/EntityDataFind?selectedEntity=YourEntityName
+   - Navigate to:
+     http://localhost:8080/qapps/tools/Entity/DataEdit/EntityDataFind?selectedEntity=YourEntityName
    - Search, create, edit, or delete records through the UI
    - Immediately see results and validation errors
    
@@ -287,7 +352,8 @@ When adding or modifying entities:
         http://localhost:8080/rest/s1/mantle/parties
    ```
    
-   **Note**: Entity REST API (/rest/e1/) requires special permissions not granted by default to john.doe user
+   **Note**: Entity REST API (/rest/e1/) requires special permissions not
+   granted by default to john.doe user
 
 4. **Monitor server output** for:
    - SQL statements being executed
@@ -305,20 +371,25 @@ When developing screens (XML widget system → FreeMarker macros → HTML):
 
 1. **Define/modify screen** in `screen/*.xml` files
 
-2. **Reload in browser** (usually no restart needed for screen changes in dev mode)
+2. **Reload in browser** (usually no restart needed for screen changes in dev
+   mode)
 
 3. **Navigate to the screen**: `http://localhost:8080/apps/YourApp/YourScreen`
 
-4. **Test transitions** (form submissions, links) and **monitor server output** for rendering errors
+4. **Test transitions** (form submissions, links) and **monitor server output**
+   for rendering errors
 
-5. **Inspect browser output** using developer tools (HTML, network tab, console errors)
+5. **Inspect browser output** using developer tools (HTML, network tab, console
+   errors)
 
 6. **Fix issues and refresh** browser until UI works correctly
 
 ### When to Restart the Server
 
-- **No restart needed**: Service XML/Groovy changes, Screen XML changes, data file changes
-- **Restart required**: Entity definition changes, SECA/EECA rule changes, configuration changes (MoquiConf.xml), dependency changes
+- **No restart needed**: Service XML/Groovy changes, Screen XML changes, data
+  file changes
+- **Restart required**: Entity definition changes, SECA/EECA rule changes,
+  configuration changes (MoquiConf.xml), dependency changes
 
 ### Key Testing Endpoints
 
@@ -326,7 +397,8 @@ When developing screens (XML widget system → FreeMarker macros → HTML):
 - **Service Runner UI**: http://localhost:8080/qapps/tools/Service/ServiceRun
   - Test ANY service by name without REST configuration
   - Most flexible for iterative development
-- **Entity Data Browser**: http://localhost:8080/qapps/tools/Entity/DataEdit/EntityDataFind
+- **Entity Data Browser**:
+  http://localhost:8080/qapps/tools/Entity/DataEdit/EntityDataFind
   - Browse, create, edit, delete entity records visually
   - Works with all entities regardless of permissions
 
@@ -353,18 +425,27 @@ Three types of REST APIs are available:
 
 ### Reading Server Output for Errors
 
-The server console output (`./gradlew run` stdout/stderr) shows all logging. Common error patterns:
+The server console output (`./gradlew run` stdout/stderr) shows all logging.
+Common error patterns:
 
-- **Service not found**: `Could not find service with name [...]` → Check service name spelling and path
-- **Entity not found**: `Could not find definition for entity name [...]` → Verify entity name
-- **Missing required parameter**: `Required parameter [...] not found` → Check service in-parameters
-- **Field constraint violation**: SQL constraint errors → Review entity field definitions and required flags
-- **Authentication failure**: `User does not have permission` → Check service authenticate attribute and user permissions
-- **Null pointer exceptions**: Often indicate missing data or incorrect entity relationships
+- **Service not found**: `Could not find service with name [...]` → Check
+  service name spelling and path
+- **Entity not found**: `Could not find definition for entity name [...]` →
+  Verify entity name
+- **Missing required parameter**: `Required parameter [...] not found` → Check
+  service in-parameters
+- **Field constraint violation**: SQL constraint errors → Review entity field
+  definitions and required flags
+- **Authentication failure**: `User does not have permission` → Check service
+  authenticate attribute and user permissions
+- **Null pointer exceptions**: Often indicate missing data or incorrect entity
+  relationships
 
-Always read the full stack trace in the server output - Moqui provides detailed error context including the service call stack and entity operation details.
+Always read the full stack trace in the server output - Moqui provides detailed
+error context including the service call stack and entity operation details.
 
-The same logs are written to `runtime/log/moqui.log` if you need to search or review past output.
+The same logs are written to `runtime/log/moqui.log` if you need to search or
+review past output.
 
 ## Troubleshooting
 
@@ -412,7 +493,8 @@ tail -50 runtime/log/moqui.log
 - **404 Error** → Service not exposed in `*.rest.xml`, use ServiceRun UI instead
 - **403 Error** → Check service `authenticate` attribute and user permissions
 - **500 Error** → Check server logs for stack trace and error details
-- **Connection Refused** → Server not running, check with `grep ServerConnector runtime/log/moqui.log`
+- **Connection Refused** → Server not running, check with `grep ServerConnector
+  runtime/log/moqui.log`
 
 **Service Changes Not Applying**:
 ```bash
@@ -451,22 +533,30 @@ grep "your-change-marker" path/to/YourService.xml
 ```
 
 **Can't Access Entity via REST**:
-- **Entity REST** (`/rest/e1/`) requires special permissions john.doe doesn't have
-- **Use instead**: EntityDataFind UI or Custom REST API (if exposed in `*.rest.xml`)
+- **Entity REST** (`/rest/e1/`) requires special permissions john.doe doesn't
+  have
+- **Use instead**: EntityDataFind UI or Custom REST API (if exposed in
+  `*.rest.xml`)
 
 ## Coding standards and criteria
 
-- Prefer existing entities and services (especially in `mantle-udm` and `mantle-usl`) before adding new ones.
-- Use the DSLs (entity/service/screen/form/actions) where appropriate; avoid custom Java/Groovy when a DSL exists.
+- Prefer existing entities and services (especially in `mantle-udm` and
+  `mantle-usl`) before adding new ones.
+- Use the DSLs (entity/service/screen/form/actions) where appropriate; avoid
+  custom Java/Groovy when a DSL exists.
 - Keep changes minimal and consistent with existing Groovy/Java style.
-- Avoid editing generated/output directories (e.g., `build/`, `framework/build/`, `runtime/log/`, `runtime/db/`).
+- Avoid editing generated/output directories (e.g., `build/`,
+  `framework/build/`, `runtime/log/`, `runtime/db/`).
 
 ## Component discovery
 
-Community components are listed in `addons.xml`. Use it to see the ecosystem and defaults, but keep component-specific details inside each component's own AGENTS.md.
+Community components are listed in `addons.xml`. Use it to see the ecosystem and
+defaults, but keep component-specific details inside each component's own
+AGENTS.md.
 
 ## Documentation entry points (framework)
 
 - Index: https://moqui.org/docs/framework
 - Full page list: https://moqui.org/m/alldocs/framework
-- Key references: Tool/Config Overview, Data Model, Services, XML Actions, XML Screen/Form, Source Management, Security.
+- Key references: Tool/Config Overview, Data Model, Services, XML Actions, XML
+  Screen/Form, Source Management, Security.
