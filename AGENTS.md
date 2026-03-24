@@ -109,82 +109,35 @@ Moqui code. The server must be started by the agent, and implementations should
 be tested iteratively by calling services/querying entities and monitoring
 server output until the code truly works.
 
-### Initial Setup and Server Start
+### Server Management
 
-Moqui requires 3 servers to run: database (embedded H2 for development),
-OpenSearch (for search/indexing), and Moqui itself.
+Moqui requires 3 servers: database (embedded H2), OpenSearch, and Moqui itself.
 
-**First-time setup** (one-time only):
+**Initial setup** (one-time):
 ```bash
-./gradlew downloadOpenSearch    # Downloads OpenSearch to runtime/opensearch
-./gradlew startElasticSearch    # Start OpenSearch in daemon mode (stays running)
+./gradlew downloadOpenSearch startElasticSearch load
 ```
 
-**Standard development workflow:**
+**Server lifecycle commands:**
 ```bash
-./gradlew cleanAll              # Stops OpenSearch, deletes all data (does NOT restart OpenSearch automatically)
-./gradlew startElasticSearch    # Restart OpenSearch after cleanAll
-./gradlew load                  # Build framework and load seed/demo data
-```
-
-**Starting the Moqui server:**
-
-Start the server in the background and wait for it to be ready:
-
-```bash
-# IMPORTANT: Stop any existing server first to avoid port conflicts
-pkill -f "gradlew run"
-# Also kill any java process using port 8080 (in case Gradle spawned it)
-kill $(ss -tlnp 2>/dev/null | grep :8080 | grep -oP 'pid=\K\d+' | head -1) 2>/dev/null || true
-sleep 2
-
-# Start server in background (output goes to /tmp/moqui-server.log)
+# Start (always stop first to avoid port conflicts)
+pkill -f "gradlew run"; kill -9 $(ss -tlnp 2>/dev/null | grep :8080 | grep -oP 'pid=\K\d+') 2>/dev/null; sleep 2
 nohup ./gradlew run > /tmp/moqui-server.log 2>&1 &
+# Wait: grep -q "Started.*8080" /tmp/moqui-server.log (or use strings if binary)
 
-# Wait for server to be ready (typically within less than a minute)
-for i in {1..60}; do
-  if grep -q "Started oejs.ServerConnector.*8080" /tmp/moqui-server.log 2>/dev/null || \
-     strings /tmp/moqui-server.log 2>/dev/null | grep -q "Started oejs.ServerConnector.*8080"; then
-    echo "Server is ready!"
-    break
-  fi
-  sleep 1
-done
+# Stop
+pkill -f "gradlew run"; kill -9 $(ss -tlnp 2>/dev/null | grep :8080 | grep -oP 'pid=\K\d+') 2>/dev/null; sleep 2
+
+# Restart (required for: entity changes, configuration changes, SECA/EECA changes)
+# No restart needed for: service changes, screen changes, data file changes
 ```
 
-**Verifying Server is Running**:
+**Verify running:**
 ```bash
-# Test with a simple REST call
 curl -u john.doe:moqui http://localhost:8080/rest/s1/mantle/parties
-# Or check the log for the startup message (use strings if log is binary)
-grep "Started oejs.ServerConnector.*8080" /tmp/moqui-server.log || strings /tmp/moqui-server.log | grep "Started oejs.ServerConnector.*8080"
 ```
 
-**Stopping the Server**:
-```bash
-# IMPORTANT: Stop any existing server first to avoid port conflicts
-pkill -f "gradlew run"
-# Also kill any java process using port 8080 (in case Gradle spawned it)
-kill $(ss -tlnp 2>/dev/null | grep :8080 | grep -oP 'pid=\K\d+' | head -1) 2>/dev/null || true
-sleep 2
-# Verify port is free
-ss -tlnp 2>/dev/null | grep :8080 || echo "Port 8080 is free"
-```
-
-**Notes:**
-- **ALWAYS stop any existing server before starting** to avoid port 8080 conflicts
-- `./gradlew run` does NOT auto-start OpenSearch - start it manually first with
-  `./gradlew startElasticSearch`
-- Server logs available in `/tmp/moqui-server.log` AND in `runtime/log/moqui.log`
-- If the server doesn't respond after seeing the log message, wait 5-10 more
-  seconds for full initialization
-
-The server starts at http://localhost:8080 with default credentials: `john.doe`
-/ `moqui` (super admin user created by demo data)
-
-**Authentication**: Most curl examples require basic authentication with `-u
-john.doe:moqui` unless otherwise noted. This user is only available after
-loading demo data (`./gradlew load` includes demo data by default).
+Server at http://localhost:8080, credentials: `john.doe` / `moqui` (from demo data).
 
 ### Data Management and Loading
 
@@ -437,31 +390,6 @@ When developing screens (XML widget system → FreeMarker macros → HTML):
 
 6. **Fix issues and refresh** browser until UI works correctly
 
-### When to Restart the Server
-- **No restart needed**: Service XML/Groovy changes, Screen XML changes, data
-  file changes
-- **Restart required**: Entity definition changes, SECA/EECA rule changes,
-  configuration changes (MoquiConf.xml), dependency changes
-**How to Restart the Server**:
-```bash
-# Stop the running server
-pkill -f "gradlew run"
-# Also kill any java process using port 8080 (in case Gradle spawned it)
-kill $(ss -tlnp 2>/dev/null | grep :8080 | grep -oP 'pid=\K\d+' | head -1) 2>/dev/null || true
-sleep 2
-# Start it again in background
-nohup ./gradlew run > /tmp/moqui-server.log 2>&1 &
-# Wait for server to be ready (typically 2-5 seconds after previous startup)
-for i in {1..60}; do
-  if grep -q "Started oejs.ServerConnector.*8080" /tmp/moqui-server.log 2>/dev/null || \
-     strings /tmp/moqui-server.log 2>/dev/null | grep -q "Started oejs.ServerConnector.*8080"; then
-    echo "Server is ready!"
-    break
-  fi
-  sleep 1
-done
-```
-
 ### Key Testing Endpoints
 
 **UI Tools** (Recommended for development):
@@ -534,106 +462,29 @@ review past output.
 
 ## Troubleshooting
 
-### System State Verification
-
-Run these commands at any time to check system state:
-
-```bash
-# Check OpenSearch is running
-ps aux | grep opensearch | grep -v grep
-# Should show Java process with opensearch.bootstrap.OpenSearch
-
-# Check Moqui server is running and ready
-grep "Started oejs.ServerConnector.*8080" runtime/log/moqui.log | tail -1
-# Should show: Started oejs.ServerConnector@...{0.0.0.0:8080}
-
-# Check if data is loaded
-ls -lh runtime/db/h2/moqui.mv.db
-# Should be > 50MB if demo data loaded
-
-# Test authentication
-curl -u john.doe:moqui http://localhost:8080/rest/s1/mantle/parties
-# Should return JSON with partyIdList
-```
-
 ### Common Issues
 
-**Server Won't Start**:
+**Port 8080 conflict** (`Failed to bind`, `Address already in use`):
 ```bash
-# 1. Check if OpenSearch is running
-ps aux | grep opensearch | grep -v grep
-
-# 2. If not running, start it
-./gradlew startElasticSearch
-
-# 3. Check if port 8080 is already in use
-lsof -i :8080
-# If occupied, kill the process or use different port
-
-# 4. Check server logs for errors
-tail -50 runtime/log/moqui.log
+pkill -f "gradlew run"; kill -9 $(ss -tlnp 2>/dev/null | grep :8080 | grep -oP 'pid=\K\d+') 2>/dev/null; sleep 2
 ```
 
-**Service Call Fails** (Decision Tree):
-- **404 Error** → Service not exposed in `*.rest.xml`, use ServiceRun UI instead
-- **403 Error** → Check service `authenticate` attribute and user permissions
-- **500 Error** → Check server logs for stack trace and error details
-- **Connection Refused** → Server not running, check with `grep ServerConnector
-  runtime/log/moqui.log`
-
-**Service Changes Not Applying**:
+**OpenSearch not running**:
 ```bash
-# 1. Wait 5 seconds for service cache to refresh
-sleep 5
-
-# 2. Check for syntax errors in server logs
-tail -20 runtime/log/moqui.log | grep -i error
-
-# 3. Verify file was saved correctly
-grep "your-change-marker" path/to/YourService.xml
+ps aux | grep opensearch | grep -v grep  # Verify
+./gradlew startElasticSearch             # Start if needed
 ```
 
-**Data Load Fails**:
-```bash
-# 1. Check for errors in gradle output
-./gradlew load 2>&1 | grep -i "error\|exception\|constraint"
+**Service changes not applying**: Wait 5 seconds for cache refresh
 
-# 2. Common causes:
-#    - Foreign key violations (load seed before demo)
-#    - Duplicate primary keys
-#    - Invalid entity names (must be fully qualified)
+**Entity changes not visible**: Restart server (see Server Management section)
 
-# 3. Load seed first, then demo
-./gradlew load -Ptypes=seed
-./gradlew load -Ptypes=demo
-```
+**Service call errors**:
+- 404 → Use ServiceRun UI (`/qapps/tools/Service/ServiceRun`)
+- 403 → Check permissions
+- 500 → Check `tail runtime/log/moqui.log`
 
-**Entity Changes Not Visible**:
-```bash
-# Entity changes REQUIRE server restart
-# 1. Stop server
-pkill -f "gradlew run"
-
-# 2. Start server again in background
-nohup ./gradlew run > /tmp/moqui-server.log 2>&1 &
-
-# 3. Wait for: Started oejs.ServerConnector.*8080
-for i in {1..60}; do
-  if grep -q "Started oejs.ServerConnector.*8080" /tmp/moqui-server.log 2>/dev/null; then
-    echo "Server is ready!"
-    break
-  fi
-  sleep 1
-done
-
-# 4. Test with EntityDataFind UI
-```
-
-**Can't Access Entity via REST**:
-- **Entity REST** (`/rest/e1/`) requires special permissions john.doe doesn't
-  have
-- **Use instead**: EntityDataFind UI or Custom REST API (if exposed in
-  `*.rest.xml`)
+**Data load fails**: Server must be stopped first.
 
 ## Coding standards and criteria
 
