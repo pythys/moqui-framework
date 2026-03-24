@@ -141,7 +141,7 @@ sleep 2
 # Start server in background (output goes to /tmp/moqui-server.log)
 nohup ./gradlew run > /tmp/moqui-server.log 2>&1 &
 
-# Wait for server to be ready (typically 2-5 seconds after previous startup)
+# Wait for server to be ready (typically within less than a minute)
 for i in {1..60}; do
   if grep -q "Started oejs.ServerConnector.*8080" /tmp/moqui-server.log 2>/dev/null || \
      strings /tmp/moqui-server.log 2>/dev/null | grep -q "Started oejs.ServerConnector.*8080"; then
@@ -388,27 +388,8 @@ When implementing or modifying services, follow this iterative workflow:
 ### Entity Development Feedback Loop
 
 When adding or modifying entities:
-
 1. **Define/modify entity** in `entity/*.xml` files
-
-2. **Restart the server** (entity definition changes require restart):
-   ```bash
-   # Stop the running server
-   pkill -f "gradlew run"
-
-   # Start it again in background
-   nohup ./gradlew run > /tmp/moqui-server.log 2>&1 &
-
-   # Wait for server to be ready
-   for i in {1..60}; do
-     if grep -q "Started oejs.ServerConnector.*8080" /tmp/moqui-server.log 2>/dev/null; then
-       echo "Server is ready!"
-       break
-     fi
-     sleep 1
-   done
-   ```
-
+2. **Restart the server** (entity definition changes require restart - see "When to Restart the Server" section above)
 3. **Test entity operations**:
 
    **Option A: EntityDataFind UI** (Recommended - most visual and interactive):
@@ -457,11 +438,29 @@ When developing screens (XML widget system → FreeMarker macros → HTML):
 6. **Fix issues and refresh** browser until UI works correctly
 
 ### When to Restart the Server
-
 - **No restart needed**: Service XML/Groovy changes, Screen XML changes, data
   file changes
 - **Restart required**: Entity definition changes, SECA/EECA rule changes,
   configuration changes (MoquiConf.xml), dependency changes
+**How to Restart the Server**:
+```bash
+# Stop the running server
+pkill -f "gradlew run"
+# Also kill any java process using port 8080 (in case Gradle spawned it)
+kill $(ss -tlnp 2>/dev/null | grep :8080 | grep -oP 'pid=\K\d+' | head -1) 2>/dev/null || true
+sleep 2
+# Start it again in background
+nohup ./gradlew run > /tmp/moqui-server.log 2>&1 &
+# Wait for server to be ready (typically 2-5 seconds after previous startup)
+for i in {1..60}; do
+  if grep -q "Started oejs.ServerConnector.*8080" /tmp/moqui-server.log 2>/dev/null || \
+     strings /tmp/moqui-server.log 2>/dev/null | grep -q "Started oejs.ServerConnector.*8080"; then
+    echo "Server is ready!"
+    break
+  fi
+  sleep 1
+done
+```
 
 ### Key Testing Endpoints
 
